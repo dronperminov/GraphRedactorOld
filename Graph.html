@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Graph</title>
+
+    <style>
+        canvas { border: 1px solid #000; }
+    </style>
+</head>
+<body oncontextmenu="return false">
+
+    <canvas id="canvas"></canvas>
+    <img src="icons/move.png" id="move-icon" style="display: none" />
+    <img src="icons/vertex.png" id="vertex-icon" style="display: none" />
+    <img src="icons/edge.png" id="edge-icon" style="display: none" />
+    
+    <img src="icons/move_active.png" id="move-icon-active" style="display: none" />
+    <img src="icons/vertex_active.png" id="vertex-icon-active" style="display: none" />
+    <img src="icons/edge_active.png" id="edge-icon-active" style="display: none" />
+
+    <script src="graph.js"></script>
+    <script>
+        const WIDTH = 960
+        const HEIGHT = WIDTH / 16 * 9
+
+        let canvas = document.getElementById("canvas")
+        canvas.width = WIDTH
+        canvas.height = HEIGHT
+
+        let graph = new Graph(canvas)
+
+        graph.Draw()
+
+        document.addEventListener('mousedown', function(e) { graph.MouseDown(e) })
+        document.addEventListener('mouseup', function(e) { graph.MouseUp(e) })
+        document.addEventListener('mousemove', function(e) { graph.MouseMove(e) })
+        document.addEventListener('mousewheel', function(e) { graph.MouseWheel(e) })
+    </script>
+</body>
+</html>
