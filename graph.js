@@ -23,9 +23,14 @@ function Graph(canvas) {
     this.prevPoint = null
     this.isPressed = false
     this.moveIndex = -1
+    this.edgeIndex = -1
     
     this.vertexColor = '#40bfbf'
     this.vertexSelectedColor = '#62dfdf'
+
+    this.edgeColor = '#000'
+    this.edgeActiveColor = '#40bfbf'
+
     this.activeColor = '#40bfbf'
 }
 
@@ -112,8 +117,24 @@ Graph.prototype.AddVertex = function(mx, my) {
 Graph.prototype.RemoveVertex = function(mx, my) {
     let index = this.IndexOfVertex(mx, my)
 
-    if (index > -1)
-        this.vertices.splice(index, 1)
+    if (index == -1)
+        return
+
+    // удаляем рёбра, связанные с этой вершиной и обновляем связи у остальных
+    for (let i = this.edges.length - 1; i >= 0; i--) {
+        if (this.edges[i].v1 == index || this.edges[i].v2 == index) {
+            this.edges.splice(i, 1)
+            continue
+        }
+
+        if (this.edges[i].v1 > index)
+            this.edges[i].v1--
+
+        if (this.edges[i].v2 > index)
+            this.edges[i].v2--
+    }
+
+    this.vertices.splice(index, 1)
 }
 
 // обработка перемещения вершины
@@ -144,6 +165,54 @@ Graph.prototype.MoveVertex = function(mx, my) {
     }
 }
 
+
+// наличие ребра v1-v2
+Graph.prototype.HaveEdge = function(v1, v2) {
+    for (let i = 0; i < this.edges.length; i++)
+        if (this.edges[i].v1 == v1 && this.edges[i].v2 == v2)
+            return true
+
+    return false
+}
+
+// добавление ребра
+Graph.prototype.AddEdge = function(mx, my) {
+    if (this.edgeIndex == -1) { // если ребра ещё нет
+        this.edgeIndex = this.IndexOfVertex(mx, my)
+    }
+    else {
+        let endIndex = this.IndexOfVertex(mx, my)
+
+        if (endIndex != -1 && !this.HaveEdge(this.edgeIndex, endIndex)) {
+            this.edges.push({ v1: this.edgeIndex, v2: endIndex })
+        }
+
+        this.edgeIndex = -1
+    }
+}
+
+// обработка перемещения мыши в режиме рёбер
+Graph.prototype.MoveEdge = function(mx, my) {
+    this.Draw();
+    let index = this.IndexOfVertex(mx, my)
+
+    if (this.edgeIndex == -1) {
+        if (index > -1)
+            this.DrawVertex(this.vertices[index], index + 1, true)
+
+        return
+    }
+
+    let x = this.vertices[this.edgeIndex].x + this.x0
+    let y = this.vertices[this.edgeIndex].y + this.y0
+
+    this.DrawEdge(x, y, mx, my, true)
+    this.DrawVertex(this.vertices[this.edgeIndex], this.edgeIndex + 1, true)
+
+    if (index > -1 && !this.HaveEdge(this.edgeIndex, index))
+        this.DrawVertex(this.vertices[index], index + 1, true)
+}
+
 // обработка нажатия кнопки мыши
 Graph.prototype.MouseDown = function(e) {
     if (this.IsMouseInControls(e.offsetX, e.offsetY)) {
@@ -153,10 +222,20 @@ Graph.prototype.MouseDown = function(e) {
     }
 
     if (this.GetControl() == VERTEX_MODE) {
-        if (e.button == 0)
+        if (e.button == 0) {
             this.AddVertex(e.offsetX, e.offsetY)
-        else
+        }
+        else {
             this.RemoveVertex(e.offsetX, e.offsetY)
+        }
+
+        this.Draw()
+    }
+
+    if (this.GetControl() == EDGE_MODE) {
+        if (e.button == 0) {
+            this.AddEdge(e.offsetX, e.offsetY)
+        }
 
         this.Draw()
     }
@@ -190,6 +269,12 @@ Graph.prototype.MouseMove = function(e) {
 
     if (this.GetControl() == VERTEX_MODE) {
         this.MoveVertex(e.offsetX, e.offsetY)
+        return
+    }
+
+    if (this.GetControl() == EDGE_MODE) {
+        this.MoveEdge(e.offsetX, e.offsetY)
+        return
     }
 }
 
@@ -198,6 +283,10 @@ Graph.prototype.MouseWheel = function(e) {
     let direction = e.deltaY > 0 ? 1 : -1
 
     this.controlsIndex = (this.controlsIndex + this.controls.length + direction) % this.controls.length
+    this.moveIndex = -1
+    this.edgeIndex = -1
+
+    this.MouseMove(e.offsetX, e.offsetY)
     this.Draw()
 }
 
@@ -224,6 +313,29 @@ Graph.prototype.DrawControls = function() {
     }
 }
 
+Graph.prototype.DrawEdge = function(x1, y1, x2, y2, isActive=false) {
+    this.ctx.beginPath()
+    this.ctx.moveTo(x1, y1)
+    this.ctx.lineTo(x2, y2)
+    this.ctx.strokeStyle = isActive ? this.edgeActiveColor : this.edgeColor
+    this.ctx.stroke()
+}
+
+// отрисовка рёбер
+Graph.prototype.DrawEdges = function() {
+    for (let i = 0; i < this.edges.length; i++) {
+        let v1 = this.edges[i].v1
+        let x1 = this.vertices[v1].x + this.x0
+        let y1 = this.vertices[v1].y + this.y0
+
+        let v2 = this.edges[i].v2
+        let x2 = this.vertices[v2].x + this.x0
+        let y2 = this.vertices[v2].y + this.y0
+
+        this.DrawEdge(x1, y1, x2, y2)
+    }
+}
+
 // отрисовка вершины
 Graph.prototype.DrawVertex = function(vertex, name, selected=false) {
     let x = vertex.x + this.x0
@@ -238,8 +350,10 @@ Graph.prototype.DrawVertex = function(vertex, name, selected=false) {
         this.ctx.fillStyle = '#fff'
     }
     else {
+        this.ctx.fillStyle = '#fff'
+        this.ctx.fill()
         this.ctx.strokeStyle = this.vertexColor
-        this.ctx.stroke()        
+        this.ctx.stroke()
         this.ctx.fillStyle = this.vertexColor
     }
 
@@ -257,6 +371,7 @@ Graph.prototype.DrawVertices = function() {
 Graph.prototype.Draw = function() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
 
+    this.DrawEdges()
     this.DrawVertices()
     this.DrawControls()
 }
