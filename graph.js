@@ -165,6 +165,41 @@ Graph.prototype.MoveVertex = function(mx, my) {
     }
 }
 
+// расстояние от точки до ребра
+Graph.prototype.GetEdgeDistance = function(edge, mx, my) {
+    let x1 = this.vertices[edge.v1].x + this.x0
+    let y1 = this.vertices[edge.v1].y + this.y0
+
+    let x2 = this.vertices[edge.v2].x + this.x0
+    let y2 = this.vertices[edge.v2].y + this.y0
+
+    let dx = x2 - x1
+    let dy = y2 - y1
+
+    let t = Math.min(1, Math.max(0, ((mx - x1) * dx + (my - y1) * dy) / (dx*dx + dy*dy)))
+
+    return Math.sqrt((x1 - mx + dx * t) * (x1 - mx + dx * t) + (y1 - my + dy * t) * (y1 - my + dy * t))
+}
+
+// получение индекса ближайшего к мыши ребра
+Graph.prototype.IndexOfEdge = function(mx, my, delta=5) {
+    let imin = -1
+    let minDistance = 0
+
+    for (let i = 0; i < this.edges.length; i++) {
+        let dst = this.GetEdgeDistance(this.edges[i], mx, my)
+
+        if (imin == -1 || dst < minDistance) {
+            imin = i
+            minDistance = dst
+        }
+    }
+
+    if (minDistance < delta)
+        return imin
+
+    return -1
+}
 
 // наличие ребра v1-v2
 Graph.prototype.HaveEdge = function(v1, v2) {
@@ -191,14 +226,34 @@ Graph.prototype.AddEdge = function(mx, my) {
     }
 }
 
+// удаление ребра
+Graph.prototype.RemoveEdge = function(mx, my) {
+    let index = this.IndexOfEdge(mx, my)
+
+    if (index > -1) {
+        this.edges.splice(index, 1)
+        this.canvas.style.cursor = "default"
+    }
+}
+
 // обработка перемещения мыши в режиме рёбер
 Graph.prototype.MoveEdge = function(mx, my) {
     this.Draw();
     let index = this.IndexOfVertex(mx, my)
 
     if (this.edgeIndex == -1) {
-        if (index > -1)
+        if (index > -1) {
             this.DrawVertex(this.vertices[index], index + 1, true)
+        }
+        else {
+            let edgeIndex = this.IndexOfEdge(mx, my)
+
+            if (edgeIndex > -1) {
+                this.canvas.style.cursor = "pointer"
+                this.DrawEdge(this.edges[edgeIndex], true)
+                this.DrawVertices()
+            }
+        }
 
         return
     }
@@ -206,7 +261,7 @@ Graph.prototype.MoveEdge = function(mx, my) {
     let x = this.vertices[this.edgeIndex].x + this.x0
     let y = this.vertices[this.edgeIndex].y + this.y0
 
-    this.DrawEdge(x, y, mx, my, true)
+    this.DrawEdgeByPoint(x, y, mx, my, true)
     this.DrawVertex(this.vertices[this.edgeIndex], this.edgeIndex + 1, true)
 
     if (index > -1 && !this.HaveEdge(this.edgeIndex, index))
@@ -235,6 +290,9 @@ Graph.prototype.MouseDown = function(e) {
     if (this.GetControl() == EDGE_MODE) {
         if (e.button == 0) {
             this.AddEdge(e.offsetX, e.offsetY)
+        }
+        else {
+            this.RemoveEdge(e.offsetX, e.offsetY)
         }
 
         this.Draw()
@@ -313,7 +371,7 @@ Graph.prototype.DrawControls = function() {
     }
 }
 
-Graph.prototype.DrawEdge = function(x1, y1, x2, y2, isActive=false) {
+Graph.prototype.DrawEdgeByPoint = function(x1, y1, x2, y2, isActive=false) {
     this.ctx.beginPath()
     this.ctx.moveTo(x1, y1)
     this.ctx.lineTo(x2, y2)
@@ -321,19 +379,21 @@ Graph.prototype.DrawEdge = function(x1, y1, x2, y2, isActive=false) {
     this.ctx.stroke()
 }
 
+// отрисовка ребра
+Graph.prototype.DrawEdge = function(edge, isActive=false) {
+    let x1 = this.vertices[edge.v1].x + this.x0
+    let y1 = this.vertices[edge.v1].y + this.y0
+
+    let x2 = this.vertices[edge.v2].x + this.x0
+    let y2 = this.vertices[edge.v2].y + this.y0
+
+    this.DrawEdgeByPoint(x1, y1, x2, y2, isActive)
+}
+
 // отрисовка рёбер
 Graph.prototype.DrawEdges = function() {
-    for (let i = 0; i < this.edges.length; i++) {
-        let v1 = this.edges[i].v1
-        let x1 = this.vertices[v1].x + this.x0
-        let y1 = this.vertices[v1].y + this.y0
-
-        let v2 = this.edges[i].v2
-        let x2 = this.vertices[v2].x + this.x0
-        let y2 = this.vertices[v2].y + this.y0
-
-        this.DrawEdge(x1, y1, x2, y2)
-    }
+    for (let i = 0; i < this.edges.length; i++)
+        this.DrawEdge(this.edges[i])
 }
 
 // отрисовка вершины
